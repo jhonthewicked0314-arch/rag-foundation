@@ -1,0 +1,10 @@
+flask==3.0.3
+flask-cors==4.0.1
+gunicorn==22.0.0
+langchain==0.3.7
+langchain-community==0.3.5
+langchain-google-genai==2.0.1
+langchain-pinecone==0.2.0
+pinecone-client==5.0.1
+python-dotenv==1.0.1
+pypdf==5.1.0
