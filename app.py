@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "<h1>RAG Foundation Live!</h1><p>Gemini & Pinecone packages ready.</p>"
+    return "<h1>RAG Foundation Live!</h1><p>Database and Google API ready.</p>"
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
