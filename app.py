@@ -23,8 +23,7 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Setup Models
 embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.3)
-index_name = os.getenv("PINECONE_INDEX_NAME")
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0.3, google_api_key=google_api_key)
 
 HTML_UI = """
 <!DOCTYPE html>
