@@ -12,18 +12,25 @@ from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 
+# 1. Load the environment
 load_dotenv()
 
 app = Flask(__name__)
 
+# 2. DEFINE YOUR KEYS HERE (Must be above models)
+google_api_key = os.getenv("GOOGLE_API_KEY")
+pinecone_api_key = os.getenv("PINECONE_API_KEY")
+index_name = os.getenv("PINECONE_INDEX_NAME")
+
+# 3. NOW SETUP MODELS (Because the keys now exist)
+embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
+
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0.3, google_api_key=google_api_key)
 # Configure Uploads
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Setup Models
-embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0.3, google_api_key=google_api_key)
 
 HTML_UI = """
 <!DOCTYPE html>
