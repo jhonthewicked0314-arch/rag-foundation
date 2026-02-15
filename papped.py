@@ -155,14 +155,14 @@ def chat():
             pinecone_api_key=pinecone_api_key
         )
         
-        system_prompt = (
-            "Use the following pieces of context to answer the question. "
-            "If you don't know, say you don't know.\n\n{context}"
+      system_prompt = (
+            "You are a helpful assistant. Use the following pieces of context to answer the question. "
+            "Answer concisely in PLAIN TEXT. "
+            "IMPORTANT: Do not use Markdown, bolding (no stars like **), or special formatting. "
+            "Just give a clean, simple text response."
+            "\n\n"
+            "{context}"
         )
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("human", "{input}"),
-        ])
         
         question_answer_chain = create_stuff_documents_chain(llm, prompt)
         rag_chain = create_retrieval_chain(vectorstore.as_retriever(), question_answer_chain)
