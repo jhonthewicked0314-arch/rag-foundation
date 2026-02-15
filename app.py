@@ -22,7 +22,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Setup Models
-embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
 llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.3)
 index_name = os.getenv("PINECONE_INDEX_NAME")
 
