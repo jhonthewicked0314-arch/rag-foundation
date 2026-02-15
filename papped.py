@@ -44,63 +44,61 @@ HTML_UI = """
 <html>
 <head>
     <title>Gemini RAG Bot</title>
-    <!-- Add Markdown Parser to fix the stars issue -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 850px; margin: 30px auto; background-color: #f4f7f6; color: #333; }
+        body { font-family: 'Segoe UI', sans-serif; max-width: 850px; margin: 30px auto; background-color: #f4f7f6; color: #333; }
         .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
         
-        /* Fixed Drag & Drop Styling */
+        /* Drag & Drop Zone Styling */
         #drop-zone {
             border: 3px dashed #4285f4;
             border-radius: 15px;
-            padding: 50px;
+            padding: 60px 20px;
             text-align: center;
             color: #4285f4;
             font-weight: bold;
             background: #f8faff;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
             cursor: pointer;
             margin-bottom: 20px;
+            position: relative;
         }
-        #drop-zone.hover { background: #e8f0fe; border-color: #1a73e8; transform: scale(1.01); }
+        #drop-zone.hover { 
+            background: #e8f0fe; 
+            border-color: #1a73e8; 
+            box-shadow: inset 0 0 10px rgba(66,133,244,0.2);
+        }
+        #drop-zone p { margin: 0; pointer-events: none; } /* Prevents text from blocking the drop */
         
         input[type="file"] { display: none; }
         
-        #chat-box { height: 450px; overflow-y: auto; border: 1px solid #eee; padding: 20px; margin-bottom: 20px; background: #fafafa; border-radius: 10px; }
-        
-        .msg { margin-bottom: 15px; padding: 10px 15px; border-radius: 8px; line-height: 1.6; }
-        .user-msg { background: #e3f2fd; color: #0d47a1; align-self: flex-end; border-left: 5px solid #1a73e8; }
-        .bot-msg { background: #ffffff; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
-        
-        /* Markdown Styling inside chat */
-        .bot-msg p { margin: 5px 0; }
-        .bot-msg strong { color: #1a73e8; }
-        .bot-msg ul { padding-left: 20px; }
+        #chat-box { height: 450px; overflow-y: auto; border: 1px solid #eee; padding: 20px; margin-bottom: 20px; background: #fafafa; border-radius: 10px; display: flex; flex-direction: column; }
+        .msg { margin-bottom: 15px; padding: 12px 16px; border-radius: 10px; line-height: 1.6; max-width: 85%; }
+        .user-msg { background: #e3f2fd; color: #0d47a1; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .bot-msg { background: white; border: 1px solid #eee; align-self: flex-start; border-bottom-left-radius: 2px; }
 
         .input-area { display: flex; gap: 10px; }
         input[id="query"] { flex: 1; padding: 15px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
         button { padding: 10px 25px; background: #4285f4; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        button:hover { background: #357abd; }
         #status { font-size: 0.9em; margin-top: 10px; color: #666; font-style: italic; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>📚 Gemini PDF Knowledge Bot</h2>
+        <h2>📚 Gemini Knowledge Bot</h2>
         
         <!-- Drag & Drop Zone -->
         <div id="drop-zone">
-            <span>📁 Drag & Drop your PDF here or Click to Browse</span>
+            <p id="drop-text">📁 Drag & Drop PDF here or Click to Browse</p>
             <input type="file" id="file-input" accept=".pdf">
         </div>
-        <div id="status">Ready to index.</div>
+        <div id="status">Ready.</div>
 
-        <hr style="border: 0; border-top: 1px solid #eee; margin: 25px 0;">
+        <hr style="border:0; border-top:1px solid #eee; margin:25px 0;">
 
         <div id="chat-box"></div>
         <div class="input-area">
-            <input type="text" id="query" placeholder="Ask something about your PDF...">
+            <input type="text" id="query" placeholder="Ask about your PDF...">
             <button onclick="ask()">Send</button>
         </div>
     </div>
@@ -108,54 +106,62 @@ HTML_UI = """
     <script>
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
+        const status = document.getElementById('status');
 
-        // Trigger file browser when clicking the zone
-        dropZone.onclick = () => fileInput.click();
+        // --- BULLETPROOF DRAG & DROP LOGIC ---
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
 
-        // Visual feedback when dragging files over
-        ['dragenter', 'dragover'].forEach(eName => {
-            dropZone.addEventListener(eName, (e) => {
-                e.preventDefault();
-                dropZone.classList.add('hover');
-            }, false);
+        // 1. Prevent browser from opening the file when dropped
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
         });
 
-        ['dragleave', 'drop'].forEach(eName => {
-            dropZone.addEventListener(eName, (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('hover');
-            }, false);
+        // 2. Add visual 'hover' state
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('hover'), false);
         });
 
-        // Handle the dropped file
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('hover'), false);
+        });
+
+        // 3. Handle actual drop
         dropZone.addEventListener('drop', (e) => {
-            const file = e.dataTransfer.files[0];
+            const dt = e.dataTransfer;
+            const file = dt.files[0];
             handleFile(file);
         }, false);
 
+        // 4. Handle click upload
+        dropZone.onclick = () => fileInput.click();
         fileInput.onchange = (e) => handleFile(e.target.files[0]);
 
         async function handleFile(file) {
             if (!file || file.type !== "application/pdf") {
-                alert("Please select a PDF file.");
+                alert("Please drop a valid PDF file.");
                 return;
             }
             const formData = new FormData();
             formData.append('file', file);
-            document.getElementById('status').innerText = "⏳ Processing " + file.name + "...";
+            status.innerText = "⏳ Uploading & Indexing " + file.name + "...";
             
             try {
                 const res = await fetch('/upload', { method: 'POST', body: formData });
                 const data = await res.json();
-                document.getElementById('status').innerText = data.message || data.error;
+                status.innerText = data.message || data.error;
             } catch (err) {
-                document.getElementById('status').innerText = "❌ Error uploading file.";
+                status.innerText = "❌ Connection Error.";
             }
         }
 
         async function ask() {
             const qInput = document.getElementById('query');
-            const q = qInput.value;
+            const q = qInput.value.trim();
             if (!q) return;
 
             const chatBox = document.getElementById('chat-box');
@@ -163,7 +169,7 @@ HTML_UI = """
             qInput.value = "";
 
             const loadingId = "loading-" + Date.now();
-            chatBox.innerHTML += `<div class="msg bot-msg" id="${loadingId}">⏳ Bot is thinking...</div>`;
+            chatBox.innerHTML += `<div class="msg bot-msg" id="${loadingId}">⏳ Thinking...</div>`;
             chatBox.scrollTop = chatBox.scrollHeight;
 
             try {
@@ -174,14 +180,27 @@ HTML_UI = """
                 });
                 const data = await res.json();
                 
-                // Use Marked.js to parse the response and remove the stars
-                const formattedAnswer = marked.parse(data.answer || data.error);
+                if (!res.ok) {
+                    document.getElementById(loadingId).innerText = "Bot: " + (data.error || "Error");
+                    return;
+                }
+
+                // Parse markdown stars into bold/lists
+                const formattedAnswer = marked.parse(data.answer);
                 document.getElementById(loadingId).innerHTML = `<b>Bot:</b><br>${formattedAnswer}`;
             } catch (err) {
-                document.getElementById(loadingId).innerText = "Bot: Connection error.";
+                document.getElementById(loadingId).innerText = "Bot: Connection timeout. Try again.";
             }
             chatBox.scrollTop = chatBox.scrollHeight;
         }
+        
+        // Allow 'Enter' key to send message
+        document.getElementById("query").addEventListener("keypress", function(event) {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            ask();
+          }
+        });
     </script>
 </body>
 </html>
