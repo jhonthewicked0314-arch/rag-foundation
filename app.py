@@ -24,12 +24,12 @@ index_name = os.getenv("PINECONE_INDEX_NAME")
 
 # 3. Setup Models (Using names confirmed by your list_models.py script)
 embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/gemini-embedding-001", 
+    model="models/gemini-embedding-001", # This IS in your list (31st line)
     google_api_key=google_api_key
 )
 
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash", # <--- Use the 2.0 version from your list
+    model="gemini-flash-latest", # This is the free standard model from your list
     temperature=0.3, 
     google_api_key=google_api_key
 )
