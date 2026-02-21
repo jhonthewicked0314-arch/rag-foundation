@@ -42,14 +42,21 @@ HTML_UI = """
 <html>
 <head>
     <title>Gemini RAG Bot</title>
+    <!-- Add Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 30px auto; background-color: #f9f9f9; }
         .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        #drop-zone { border: 2px dashed #4285f4; border-radius: 10px; padding: 40px; text-align: center; color: #4285f4; cursor: pointer; margin-bottom: 20px; }
+        #drop-zone { border: 2px dashed #4285f4; border-radius: 10px; padding: 40px; text-align: center; color: #4285f4; cursor: pointer; margin-bottom: 20px; transition: background 0.3s; }
+        #drop-zone.dragover { background: #e8f0fe; }
         #chat-box { height: 400px; overflow-y: auto; border: 1px solid #eee; padding: 15px; margin-bottom: 20px; background: #fafafa; border-radius: 8px; }
         .msg { margin-bottom: 10px; }
         .user-msg { color: #1a73e8; font-weight: bold; }
-        .bot-msg { color: #333; background: #eef; padding: 8px; border-radius: 5px; }
+        .bot-msg { color: #333; background: #eef; padding: 12px; border-radius: 5px; line-height: 1.5; }
+        .bot-msg p { margin-top: 0; margin-bottom: 10px; }
+        .bot-msg ul, .bot-msg ol { margin-bottom: 10px; padding-left: 20px; }
+        .bot-msg li { margin-bottom: 5px; }
+        .bot-msg code { background: #eee; padding: 2px 4px; border-radius: 4px; font-family: monospace; }
         .input-area { display: flex; gap: 10px; }
         input[type="text"] { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 6px; }
         button { padding: 10px 20px; background: #4285f4; color: white; border: none; border-radius: 6px; cursor: pointer; }
@@ -61,8 +68,8 @@ HTML_UI = """
         <h2>📚 Gemini PDF Chatbot</h2>
         <div id="drop-zone" onclick="document.getElementById('file-input').click()">
             Drag & Drop PDF here or Click to Upload
-            <input type="file" id="file-input" accept=".pdf" onchange="handleFile(this.files[0])">
         </div>
+        <input type="file" id="file-input" accept=".pdf" style="display:none" onchange="handleFile(this.files[0])">
         <div id="status"></div>
         <hr>
         <div id="chat-box"></div>
@@ -80,7 +87,25 @@ HTML_UI = """
             const res = await fetch('/upload', { method: 'POST', body: formData });
             const data = await res.json();
             document.getElementById('status').innerText = data.message || data.error;
+            // Clear input so same file can be uploaded again if needed
+            document.getElementById('file-input').value = "";
         }
+
+        const dropZone = document.getElementById('drop-zone');
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, e => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        dropZone.addEventListener('dragover', () => dropZone.classList.add('dragover'));
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length) handleFile(files[0]);
+        });
 
         async function ask() {
             const qInput = document.getElementById('query');
@@ -103,7 +128,15 @@ HTML_UI = """
                     body: JSON.stringify({question: q})
                 });
                 const data = await res.json();
-                document.getElementById(loadingId).innerText = "Bot: " + (data.answer || data.error);
+                
+                const botResponse = data.answer || data.error;
+                const botDiv = document.getElementById(loadingId);
+                
+                if (data.answer) {
+                    botDiv.innerHTML = "<strong>Bot:</strong> " + marked.parse(botResponse);
+                } else {
+                    botDiv.innerText = "Bot: " + botResponse;
+                }
             } catch (err) {
                 document.getElementById(loadingId).innerText = "Bot: Error connecting to server.";
             }
@@ -160,7 +193,10 @@ def chat():
         )
         
         system_prompt = (
-            "You are a helpful assistant. Use the following context to answer.\n\n{context}"
+            "You are a highly accurate assistant. Use ONLY the following context to answer the question.\n"
+            "If the answer is not contained within the context, simply say: 'I cannot find the answer in the provided document.'\n"
+            "Keep answers concise and relevant to the document.\n\n"
+            "Context: {context}"
         )
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
@@ -168,7 +204,7 @@ def chat():
         ])
         
         question_answer_chain = create_stuff_documents_chain(llm, prompt)
-        rag_chain = create_retrieval_chain(vectorstore.as_retriever(), question_answer_chain)
+        rag_chain = create_retrieval_chain(vectorstore.as_retriever(search_kwargs={"k": 6}), question_answer_chain)
         
         response = rag_chain.invoke({"input": question})
         return jsonify({"answer": response["answer"]})
