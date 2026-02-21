@@ -27,9 +27,16 @@ embeddings = GoogleGenerativeAIEmbeddings(
 )
 
 llm = ChatGoogleGenerativeAI(
-    model="models/gemini-flash-latest", # <--- Added 'models/' prefix
+    model="models/gemini-flash-latest", 
     temperature=0.3, 
     google_api_key=google_api_key
+)
+
+# 3. Global Vectorstore Reference (Optimizes performance by avoiding re-init)
+vectorstore = PineconeVectorStore(
+    index_name=index_name, 
+    embedding=embeddings, 
+    pinecone_api_key=pinecone_api_key
 )
 
 # Configure Uploads
@@ -41,41 +48,42 @@ HTML_UI = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Gemini RAG Bot</title>
+    <title>College Admission Assistant</title>
     <!-- Add Marked.js for Markdown rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 30px auto; background-color: #f9f9f9; }
-        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        #drop-zone { border: 2px dashed #4285f4; border-radius: 10px; padding: 40px; text-align: center; color: #4285f4; cursor: pointer; margin-bottom: 20px; transition: background 0.3s; }
-        #drop-zone.dragover { background: #e8f0fe; }
-        #chat-box { height: 400px; overflow-y: auto; border: 1px solid #eee; padding: 15px; margin-bottom: 20px; background: #fafafa; border-radius: 8px; }
-        .msg { margin-bottom: 10px; }
-        .user-msg { color: #1a73e8; font-weight: bold; }
-        .bot-msg { color: #333; background: #eef; padding: 12px; border-radius: 5px; line-height: 1.5; }
+        body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 30px auto; background-color: #f0f2f5; }
+        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #1a237e; }
+        #drop-zone { border: 2px dashed #1a237e; border-radius: 10px; padding: 40px; text-align: center; color: #1a237e; cursor: pointer; margin-bottom: 20px; transition: background 0.3s; }
+        #drop-zone.dragover { background: #e8eaf6; }
+        #chat-box { height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; background: #ffffff; border-radius: 8px; }
+        .msg { margin-bottom: 12px; }
+        .user-msg { color: #1a237e; font-weight: bold; }
+        .bot-msg { color: #333; background: #f5f5f5; padding: 12px; border-radius: 5px; line-height: 1.5; border-left: 4px solid #1a237e; }
         .bot-msg p { margin-top: 0; margin-bottom: 10px; }
         .bot-msg ul, .bot-msg ol { margin-bottom: 10px; padding-left: 20px; }
         .bot-msg li { margin-bottom: 5px; }
         .bot-msg code { background: #eee; padding: 2px 4px; border-radius: 4px; font-family: monospace; }
         .input-area { display: flex; gap: 10px; }
-        input[type="text"] { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 6px; }
-        button { padding: 10px 20px; background: #4285f4; color: white; border: none; border-radius: 6px; cursor: pointer; }
-        #status { font-size: 0.9em; margin-top: 10px; color: #666; }
+        input[type="text"] { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 6px; }
+        button { padding: 10px 20px; background: #1a237e; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0d1440; }
+        #status { font-size: 0.9em; margin-top: 10px; color: #1a237e; font-weight: 500; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>📚 Gemini PDF Chatbot</h2>
+        <h2 style="color: #1a237e; display: flex; align-items: center; gap: 10px;">🎓 College Admission Assistant</h2>
         <div id="drop-zone" onclick="document.getElementById('file-input').click()">
-            Drag & Drop PDF here or Click to Upload
+            Upload College Prospectus (PDF) or Click to Upload
         </div>
         <input type="file" id="file-input" accept=".pdf" style="display:none" onchange="handleFile(this.files[0])">
         <div id="status"></div>
-        <hr>
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
         <div id="chat-box"></div>
         <div class="input-area">
-            <input type="text" id="query" placeholder="Ask a question about your PDF...">
-            <button onclick="ask()">Send</button>
+            <input type="text" id="query" placeholder="Ask about courses, fees, scholarships...">
+            <button onclick="ask()">Ask Bot</button>
         </div>
     </div>
     <script>
@@ -185,17 +193,11 @@ def chat():
         data = request.json
         question = data.get('question')
         
-        # Pass API Key explicitly to prevent hanging
-        vectorstore = PineconeVectorStore(
-            index_name=index_name, 
-            embedding=embeddings, 
-            pinecone_api_key=pinecone_api_key
-        )
-        
         system_prompt = (
-            "You are a highly accurate assistant. Use ONLY the following context to answer the question.\n"
-            "If the answer is not contained within the context, simply say: 'I cannot find the answer in the provided document.'\n"
-            "Keep answers concise and relevant to the document.\n\n"
+            "You are an official College Enquiry Assistant. Your goal is to provide accurate, polite, and helpful "
+            "information about college courses, admissions, fees, and facilities based ONLY on the provided document.\n"
+            "If the answer is not contained in the document, say: 'I'm sorry, I couldn't find details about that in our prospectus. "
+            "Please contact the college office for more information.'\n\n"
             "Context: {context}"
         )
         prompt = ChatPromptTemplate.from_messages([
@@ -204,7 +206,7 @@ def chat():
         ])
         
         question_answer_chain = create_stuff_documents_chain(llm, prompt)
-        rag_chain = create_retrieval_chain(vectorstore.as_retriever(search_kwargs={"k": 6}), question_answer_chain)
+        rag_chain = create_retrieval_chain(vectorstore.as_retriever(search_kwargs={"k": 4}), question_answer_chain)
         
         response = rag_chain.invoke({"input": question})
         return jsonify({"answer": response["answer"]})
