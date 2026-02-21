@@ -32,14 +32,7 @@ llm = ChatGoogleGenerativeAI(
     google_api_key=google_api_key
 )
 
-# 3. Global Vectorstore Reference (Optimized for Live Performance)
-vectorstore = PineconeVectorStore(
-    index_name=index_name, 
-    embedding=embeddings, 
-    pinecone_api_key=pinecone_api_key
-)
-
-# Configure Uploads
+# 3. Configure Uploads
 UPLOAD_FOLDER = '/tmp'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -223,7 +216,7 @@ def upload_file():
     try:
         loader = PyPDFLoader(filepath)
         docs = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=80)
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
         splits = text_splitter.split_documents(docs)
 
         # Update Pinecone Index with the provided key
@@ -244,23 +237,27 @@ def chat():
         data = request.json
         question = data.get('question')
         
-        # Customized Persona for College Admission
+        # Fresh Vectorstore Connection (Matches working old code)
+        vectorstore = PineconeVectorStore(
+            index_name=index_name, 
+            embedding=embeddings, 
+            pinecone_api_key=pinecone_api_key
+        )
+
+        # Loosened Persona for better retrieval reliability
         system_prompt = (
-            "You are an official College Admission Assistant. Your role is to provide polite, "
-            "professional, and accurate information about courses, fees, scholarships, and campus life "
-            "based ONLY on the provided document context.\n"
-            "If the information is NOT in the document, reply: 'I'm sorry, I couldn't find that specific information "
-            "in our prospectus. Please contact the administrative office at the college for detail.'\n\n"
-            "Context: {context}"
+            "You are an official College Admission Assistant. Provide professional and "
+            "accurate information based on the provided document context.\n"
+            "If the answer isn't in the context, politely suggest contacting the college office."
+            "\n\nContext: {context}"
         )
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
             ("human", "{input}"),
         ])
         
-        # Optimize chain for live speed (k=4)
         doc_chain = create_stuff_documents_chain(llm, prompt)
-        rag_chain = create_retrieval_chain(vectorstore.as_retriever(search_kwargs={"k": 4}), doc_chain)
+        rag_chain = create_retrieval_chain(vectorstore.as_retriever(search_kwargs={"k": 5}), doc_chain)
         
         response = rag_chain.invoke({"input": question})
         return jsonify({"answer": response["answer"]})
