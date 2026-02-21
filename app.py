@@ -40,7 +40,7 @@ vectorstore = PineconeVectorStore(
 )
 
 # Configure Uploads
-UPLOAD_FOLDER = 'uploads'
+UPLOAD_FOLDER = '/tmp'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -153,10 +153,15 @@ HTML_UI = """
             try {
                 const res = await fetch('/upload', { method: 'POST', body: formData });
                 const data = await res.json();
-                status.innerText = data.message || data.error;
-                fileInput.value = ""; // Reset
+                
+                if (res.ok) {
+                    status.innerText = data.message || "Successfully indexed!";
+                } else {
+                    status.innerText = "❌ Indexing failed: " + (data.error || res.statusText);
+                }
+                fileInput.value = ""; 
             } catch (err) {
-                status.innerText = "❌ Connection failed. Check if server is live.";
+                status.innerText = "❌ Connection failed. Your PDF might be too large for a 30s timeout.";
             }
         }
 
@@ -218,7 +223,7 @@ def upload_file():
     try:
         loader = PyPDFLoader(filepath)
         docs = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=80)
         splits = text_splitter.split_documents(docs)
 
         # Update Pinecone Index with the provided key
