@@ -22,12 +22,12 @@ index_name = os.getenv("PINECONE_INDEX_NAME")
 
 # 2. Setup AI Models
 embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/gemini-embedding-001", 
+    model="models/text-embedding-004", # Google's newest embedding model (still 768 dimensions)
     google_api_key=google_api_key
 )
 
 llm = ChatGoogleGenerativeAI(
-    model="models/gemini-flash-latest", 
+    model="gemini-1.5-flash", # Stable, exact model name
     temperature=0.3, 
     google_api_key=google_api_key
 )
